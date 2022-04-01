@@ -1,9 +1,9 @@
 {
-    "name": "pterodactyl-proxy",
+    "name": "dockerproxy",
     "version": "1.0.0",
-    "description": "A proxy server for the dockerized Pterodactyl panel.",
+    "description": "A simple and highly customizable proxy server for Docker written in Node.js.    ",
     "main": "src/index.ts",
-    "repository": "https://github.com/RedstoneWizard08/Pterodocker",
+    "repository": "https://github.com/RedstoneWizard08/DockerProxy.git",
     "author": "Jacob Sapoznikow <jacob1coder@gmail.com>",
     "license": "MIT",
     "private": false,
