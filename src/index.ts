@@ -2,8 +2,9 @@ import http from "http";
 import path from "path";
 import httpProxy from "http-proxy";
 import express from "express";
+import fs from "fs";
 
-const port = process.env.PORT || 80;
+const port = parseInt(process.env.PORT || "80");
 const upstreamProtocol = process.env.UPSTREAM_PROTOCOL || "http";
 const upstreamHost = process.env.UPSTREAM_HOST || "127.0.0.1";
 const upstreamPort = process.env.UPSTREAM_PORT;
@@ -20,11 +21,12 @@ const proxy = httpProxy.createProxyServer({
     xfwd: true,
     autoRewrite: true,
     preserveHeaderKeyCase: true,
-    cookieDomainRewrite: false,
+    cookieDomainRewrite: "",
     cookiePathRewrite: false,
     protocolRewrite: "http",
-    selfHandleResponse: false,
+    selfHandleResponse: true,
 });
+
 const server = http.createServer(app);
 
 app.all("/*", (req, res) => {
@@ -42,15 +44,32 @@ app.all("/*", (req, res) => {
                 path.join(__dirname, "..", "public", "pterodactyl-error.css")
             );
     console.log(`[PROXY] Proxying to upstream at: ${upstream}${req.path}`);
-    proxy.web(req, res, {}, (err: Error, requ: http.IncomingMessage) => {
-        if (err.message.includes("ECONNREFUSED") || requ.statusCode == 503) {
-            res.status(503);
-            res.sendFile(path.join(__dirname, "..", "public", "503.html"));
-        } else {
-            res.status(500);
-            res.sendFile(path.join(__dirname, "..", "public", "500.html"));
-        }
+    proxy.on("proxyRes", (pres) => {
+        const body: Uint8Array[] = [];
+        pres.on('data', function (chunk: Uint8Array) {
+            body.push(chunk);
+        });
+        pres.on('end', function () {
+            res.type(pres.headers["content-type"] || "text/plain");
+            res.status(pres.statusCode || 200);
+            if(pres.headers["set-cookie"]) {
+                if(Array.isArray(pres.headers["set-cookie"])) {
+                    pres.headers["set-cookie"].forEach((c) => {
+                        res.append("Set-Cookie", c);
+                    });
+                } else {
+                    const cookie_ = pres.headers["set-cookie"];
+                    const cookie = (cookie_ as string).split(";");
+                    const cookie_name = cookie[0].split("=")[0];
+                    const cookie_value = cookie[0].split("=")[1];
+                    res.cookie(cookie_name, cookie_value);
+                }
+            }
+            const reqbody = Buffer.concat(body).toString();
+            res.end(reqbody);
+        });
     });
+    proxy.web(req, res);
 });
 
 server.on("upgrade", (req, socket, head) => {
